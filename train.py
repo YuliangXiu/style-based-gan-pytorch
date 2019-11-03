@@ -13,7 +13,7 @@ from torch.autograd import Variable, grad
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms, utils
 
-from dataset import MultiResolutionDataset
+from dataset import MultiResolutionDataset, To_numpy, To_tensor, load_img, load_mat, save_img, save_mat
 from model import StyledGenerator, Discriminator
 
 import random
@@ -28,32 +28,6 @@ import IPython
 import os
 import random
 import torch
-
-def To_tensor(img):
-    return torch.from_numpy(img.transpose(2, 0, 1)).float()
-
-def To_numpy(tensor):
-    return tensor.detach().cpu().numpy().transpose(1, 2, 0)
-
-
-def load_img(filename):
-    return imageio.imread(filename, format='EXR-FI')
-
-def save_img(filename_out, img, skip_if_exist=False):    
-    if skip_if_exist and os.path.exists(filename_out):
-        return
-    os.makedirs(os.path.dirname(filename_out), exist_ok=True)
-    imageio.imwrite(filename_out, img, format='EXR-FI')
-
-    
-def load_mat(filename, key):
-    return scipy.io.loadmat(filename)[key]
-
-def save_mat(filename_out, data, key, skip_if_exist=False):
-    if skip_if_exist and os.path.exists(filename_out):
-        return
-    os.makedirs(os.path.dirname(filename_out), exist_ok=True)
-    scipy.io.savemat(filename_out, {key: data})
 
 
 def requires_grad(model, flag=True):
@@ -164,28 +138,20 @@ def train(args, dataset, generator, discriminator, monitorExp):
 
         b_size = real_image.size(0)
         real_image = real_image.cuda()
-        neutral = dataset.getitem_neutral(rand=True)
-        neutral = neutral.unsqueeze(0).cuda()
 
         if args.loss == 'wgan-gp':
-            real_predict = discriminator(real_image + neutral, step=step, alpha=alpha)
+            real_predict = discriminator(real_image , step=step, alpha=alpha)
             real_predict = real_predict.mean() - 0.001 * (real_predict ** 2).mean()
             (-real_predict).backward()
 
         fake_label1 = dataset.sample_label(k=b_size, randn=True).cuda()
         fake_label2 = dataset.sample_label(k=b_size, randn=True).cuda()
         
-#         rand_scale1 = torch.rand_like(fake_label1, device=fake_label1.device) * 0.2 + 0.9 
-#         rand_scale2 = torch.rand_like(fake_label2, device=fake_label2.device) * 0.2 + 0.9 
-        
-#         fake_label1 *= rand_scale1
-#         fake_label2 *= rand_scale2
-        
         gen_in1 = fake_label1
         gen_in2 = fake_label2
         
         fake_image = generator(gen_in1, step=step, alpha=alpha)
-        fake_predict = discriminator(fake_image + neutral, step=step, alpha=alpha)
+        fake_predict = discriminator(fake_image, step=step, alpha=alpha)
 
         if args.loss == 'wgan-gp':
             fake_predict = fake_predict.mean()
@@ -194,7 +160,7 @@ def train(args, dataset, generator, discriminator, monitorExp):
             eps = torch.rand(b_size, 1, 1, 1).cuda()
             x_hat = eps * real_image.data + (1 - eps) * fake_image.data
             x_hat.requires_grad = True
-            hat_predict = discriminator(x_hat + neutral, step=step, alpha=alpha)
+            hat_predict = discriminator(x_hat, step=step, alpha=alpha)
             grad_x_hat = grad(
                 outputs=hat_predict.sum(), inputs=x_hat, create_graph=True
             )[0]
@@ -215,7 +181,7 @@ def train(args, dataset, generator, discriminator, monitorExp):
             requires_grad(discriminator, False)
 
             fake_image = generator(gen_in2, step=step, alpha=alpha)
-            predict = discriminator(fake_image + neutral, step=step, alpha=alpha)
+            predict = discriminator(fake_image, step=step, alpha=alpha)
             
             # monitor Exp
             predict_exp = monitorExp(fake_image, step=step, alpha=1.0)
@@ -243,19 +209,17 @@ def train(args, dataset, generator, discriminator, monitorExp):
                 for isample in range(nsample):
                     label_code = real_label[isample:isample+1].cuda()
                     image = g_running(label_code, step=step, alpha=alpha)
-                    score = discriminator.module(image + neutral, step=step, alpha=alpha)
+                    score = discriminator.module(image, step=step, alpha=alpha)
                     weight = monitorExp.module(image, step=step, alpha=1.0)
                 
                     image = image.data.cpu().numpy()[0].transpose(1, 2, 0)
-                    image += neutral.data.cpu().numpy()[0].transpose(1, 2, 0)
                     np.set_printoptions(precision=2, suppress=True)
                     print (f"score: {score.item():.2f}; weight: {label_code.data.cpu().numpy()}; weight_pred: {weight.data.cpu().numpy()}")
-                    imageio.imwrite(f'sample/{str(i + 1).zfill(6)}-{isample}--Fake.exr', image, format='EXR-FI')
+                    imageio.imwrite(f'sample/{str(i + 1).zfill(6)}-{isample}--Fake.jpg', image)
                     save_mat(f'sample/{str(i + 1).zfill(6)}-{isample}--Fake.mat', image, "data")
                     
                     real = real_image.data.cpu().numpy()[isample].transpose(1, 2, 0)
-                    real += neutral.data.cpu().numpy()[0].transpose(1, 2, 0)
-                    imageio.imwrite(f'sample/{str(i + 1).zfill(6)}-{isample}--Real.exr', real, format='EXR-FI')
+                    imageio.imwrite(f'sample/{str(i + 1).zfill(6)}-{isample}--Real.jpg', real)
                     save_mat(f'sample/{str(i + 1).zfill(6)}-{isample}--Real.mat', real, "data")
             
         if (i + 1) % 500 == 0:
@@ -279,8 +243,9 @@ def train(args, dataset, generator, discriminator, monitorExp):
 
 
 if __name__ == '__main__':
+
     code_size = 512
-    label_size = 25
+    label_size = 51
     batch_size = 16
     n_critic = 1
 
@@ -352,13 +317,6 @@ if __name__ == '__main__':
         g_optimizer.load_state_dict(ckpt['g_optimizer'])
         d_optimizer.load_state_dict(ckpt['d_optimizer'])
 
-    transform = transforms.Compose(
-        [
-#             transforms.RandomHorizontalFlip(),
-#             transforms.ToTensor(),
-#             transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5), inplace=True),
-        ]
-    )
 
     dataset = MultiResolutionDataset(resolution=args.init_size, exclude_neutral=True)
 
@@ -372,22 +330,20 @@ if __name__ == '__main__':
 #         args.batch = {4: 1024, 8: 512, 16: 256, 32: 128, 64: 64, 128: 64, 256: 64}
 #         args.phase = 1200_000
 
-        # 4 GPU
-        args.batch = {4: 2048, 8: 1024, 16: 512, 32: 256, 64: 128, 128: 128, 256: 128}
-        args.phase = 1200_000
+        # # 4 GPU
+        # args.batch = {4: 2048, 8: 1024, 16: 512, 32: 256, 64: 128, 128: 128, 256: 128}
+        # args.phase = 1200_000
         
 #         # 6 GPU
 #         args.batch = {4: 3072, 8: 1536, 16: 768, 32: 384, 64: 192, 128: 192, 256: 192}
 #         args.phase = 1200_000
         
-#         # 8 GPU
-#         args.batch = {4: 4096, 8: 2048, 16: 1024, 32: 512, 64: 128, 128: 64, 256: 32, 512: 16, 1024: 8}
-#         args.phase = 1200_000
+        # 8 GPU
+        args.batch = {4: 4096, 8: 2048, 16: 1024, 32: 512, 64: 128, 128: 64, 256: 32, 512: 16, 1024: 8}
+        args.phase = 1200_000
     else:
         args.lr = {}
         args.batch = {}
-
-    args.gen_sample = {512: (8, 4), 1024: (4, 2)}
 
     args.batch_default = 32
 

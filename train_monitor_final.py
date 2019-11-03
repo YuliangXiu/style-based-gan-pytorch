@@ -19,6 +19,7 @@ from model import StyledGenerator, Discriminator
 import random
 import time
 import paths
+import os
 
 def requires_grad(model, flag=True):
     for p in model.parameters():
@@ -35,7 +36,7 @@ def accumulate(model1, model2, decay=0.999):
 
 def sample_data(dataset, batch_size, image_size=4):
     dataset.resolution = image_size
-    loader = DataLoader(dataset, shuffle=True, batch_size=batch_size, num_workers=16)
+    loader = DataLoader(dataset, shuffle=True, batch_size=batch_size, num_workers=32)
 
     return loader
 
@@ -50,7 +51,7 @@ def train_monitorExp(model, resolution, batch_size):
     requires_grad(model, True)
     step = int(math.log2(resolution)) - 2
     
-    optimizer = optim.Adam(model.parameters(), lr=0.0001, betas=(0.0, 0.99))
+    optimizer = optim.Adam(model.parameters(), lr=0.0001, betas=(0.0, 0.99), weight_decay=1e-5)
     L1loss = nn.L1Loss()
     MSEloss = nn.MSELoss()
     CEloss = nn.CrossEntropyLoss()
@@ -61,8 +62,6 @@ def train_monitorExp(model, resolution, batch_size):
         
     pbar = tqdm(range(20_000))
     for i in pbar:        
-#         neutral = dataset.getitem_neutral(rand=True)
-#         neutral = neutral.unsqueeze(0).cuda()
         
         tick = time.time()
         img, label = next(data_loader)
@@ -153,16 +152,19 @@ if __name__ == "__main__":
     parser.add_argument('--trainExp', action='store_true')
     parser.add_argument('--testExp', action='store_true')
     args = parser.parse_args()
+
+    os.environ["CUDA_VISIBLE_DEVICES"]="2,3,4,5,6,7,8,9"
     
     args.batch = {64: 32, 128: 16, 256: 8, 512: 4, 1024: 2}
-    label_size = 25
+
+    label_size = 17*3
     
     if args.trainExp:
-        for step in [6, 8]:
-            resolution = 4 * 2 ** step
+        for step in [6]:
+            resolution = 2 ** step
             monitorExp = nn.DataParallel(Discriminator(from_rgb_activate=True, out_channel=label_size)).cuda()
-            ckpt = torch.load(f'checkpoint/monitorExp/resolution-{2 ** step}-iter-{19999}.model')
-            monitorExp.module.load_state_dict(ckpt['model'])
+            # ckpt = torch.load(f'checkpoint/monitorExp/resolution-{2 ** step}-iter-{19999}.model')
+            # monitorExp.module.load_state_dict(ckpt['model'])
             batch_size = args.batch.get(resolution, 32) * 16
             monitorID = train_monitorExp(monitorExp, resolution, batch_size)
             torch.cuda.empty_cache()

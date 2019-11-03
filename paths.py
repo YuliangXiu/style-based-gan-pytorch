@@ -7,16 +7,12 @@ import cv2
 import scipy.io
 from functools import partial
 from os.path import join as osp
+import numpy as np
 
-
-# roots to store data
-# root_raw = "/home/ICT2000/rli/mnt/vgldb1/LightStageFaceDB/Datasets/FaceEncoding/"
-# root_process = "/home/ICT2000/rli/mnt/glab2/ForRuilong/FaceEncoding_process2/"
-# root_yajie = "/home/ICT2000/rli/mnt/glab2/Users/yajie/"
 
 root_raw = ""
 root_process = "/mount/ForRuilong/FaceEncoding_process2/"
-root_yajie = "/mount/Users/yajie/"
+root_yajie = "./data"
 
 # folders 4k
 folder_pointcloud_4k = osp(root_raw, "PointCloud_Aligned")
@@ -46,13 +42,11 @@ file_displacement_ms = osp(folder_displacement_ms, "*_*_*_displacement.exr")
 
 # facewarehouse expression fitting 1024.
 # e.g. 20191002_RyanWatson_01_blendshape_25_iter_15.mat
-folder_exp_weights = osp(root_yajie, "RandmonMeshFacewarehouseAllExpressions")
-folder_exp_pointcloud = osp(root_yajie, "RandmonMeshFacewarehouseAllExpressions_pointCloud")
-folder_exp_pointcloud_ms = osp(root_process, "{}", "RandmonMeshFacewarehouseAllExpressions_pointCloud")
+folder_exp_weights = osp(root_yajie, "Meshes/PoseUnit")
+folder_exp_pointcloud_ms = osp(root_yajie, "TrainingData/PoseUnit_stretch/GT_output")
 
-file_exp_weights = osp(folder_exp_weights, "*_*_*_blendshape_*_iter_*.mat")
-file_exp_pointcloud = osp(folder_exp_pointcloud, "*_*_*_blendshape_*_iter_*_pointcloud.exr")
-file_exp_pointcloud_ms = osp(folder_exp_pointcloud_ms, "*_*_*_blendshape_*_iter_*_pointcloud.exr")
+file_exp_weights = osp(folder_exp_weights, "Pose_*_sequence_*.mat")
+file_exp_pointcloud_ms = osp(folder_exp_pointcloud_ms, "Pose_*_sequence_*.jpg")
 
 file_exp_meanstd = osp(root_process, "weightsFacewareMeanStd.mat")
 
@@ -92,12 +86,12 @@ def save_mat(filename_out, data, key, skip_if_exist=False):
 #############################################################
 def load_exp_mean():
     # return (25,)
-    mean = load_mat(file_exp_meanstd, "Expression_mean")[0]
+    mean = np.load("mean_std.npy", allow_pickle=True).item()['mean']
     return mean
     
 def load_exp_std():
     # return (25,)
-    std = load_mat(file_exp_meanstd, "Expression_std")[0]
+    std = np.load("mean_std.npy", allow_pickle=True).item()['std']
     return std
     
     
