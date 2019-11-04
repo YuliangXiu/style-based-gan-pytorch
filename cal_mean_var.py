@@ -16,7 +16,8 @@ mat_dir = "./data/Meshes/PoseUnit/"
 # np.save("theta.npy", weights)
 
 weights = np.load("theta.npy").reshape(-1,17*3)
-mean = np.mean(weights, axis=0)
-std = np.std(weights, axis=0)
+mean = np.array([np.mean(weights[:,col_id][np.abs(weights[:,col_id])>1e-6]) for col_id in range(17*3)])
+std = np.array([np.std(weights[:,col_id][np.abs(weights[:,col_id])>1e-6]) for col_id in range(17*3)])
+
 np.save("mean_std.npy", {'mean':mean, 'std':std})
 
