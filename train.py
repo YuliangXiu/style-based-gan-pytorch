@@ -136,7 +136,7 @@ def train(args, dataset, generator, discriminator, monitorExp):
         real_image = real_image.cuda()
 
         if args.loss == 'wgan-gp':
-            real_predict, _ = discriminator(real_image , step=step, alpha=alpha)
+            real_predict = discriminator(real_image , step=step, alpha=alpha)
             real_predict = real_predict.mean() - 0.001 * (real_predict ** 2).mean()
             (-real_predict).backward()
 
@@ -147,7 +147,7 @@ def train(args, dataset, generator, discriminator, monitorExp):
         gen_in2 = fake_label2
         
         fake_image = generator(gen_in1, step=step, alpha=alpha)
-        fake_predict,_ = discriminator(fake_image, step=step, alpha=alpha)
+        fake_predict = discriminator(fake_image, step=step, alpha=alpha)
 
         if args.loss == 'wgan-gp':
             fake_predict = fake_predict.mean()
@@ -156,7 +156,7 @@ def train(args, dataset, generator, discriminator, monitorExp):
             eps = torch.rand(b_size, 1, 1, 1).cuda()
             x_hat = eps * real_image.data + (1 - eps) * fake_image.data
             x_hat.requires_grad = True
-            hat_predict,_ = discriminator(x_hat, step=step, alpha=alpha)
+            hat_predict = discriminator(x_hat, step=step, alpha=alpha)
             grad_x_hat = grad(
                 outputs=hat_predict.sum(), inputs=x_hat, create_graph=True
             )[0]
@@ -177,25 +177,20 @@ def train(args, dataset, generator, discriminator, monitorExp):
             requires_grad(discriminator, False)
 
             fake_image = generator(gen_in2, step=step, alpha=alpha)
-            predict,_ = discriminator(fake_image, step=step, alpha=alpha)
+            predict = discriminator(fake_image, step=step, alpha=alpha)
             
             # monitor Exp
-            predict_exp, predict_cls = monitorExp(fake_image, step=step, alpha=1.0)
+            predict_exp = monitorExp(fake_image, step=step, alpha=1.0)
             loss_exp = nn.MSELoss()(predict_exp, fake_label2.detach())
-
-            choose_ids = torch.topk(torch.abs(fake_label2), dim=1, k=3)[1]
-            choose_cls_ids = (torch.min(choose_ids, dim=1)[1]/3).type(torch.cuda.LongTensor)
-            loss_cls = nn.CrossEntropyLoss()(predict_cls, choose_cls_ids)
             
             if args.loss == 'wgan-gp':
-                loss = -predict.mean() + loss_exp.mean() * 1000.0 + loss_cls.mean() * 1000.0
+                loss = -predict.mean() + loss_exp.mean() * 1000.0
 
             elif args.loss == 'r1':
                 loss = F.softplus(-predict).mean()
 
             gen_loss_val = (-predict.mean()).item()
             exp_loss_val = loss_exp.item()
-            cls_loss_val = loss_cls.item()
 
             loss.backward()
             g_optimizer.step()
@@ -210,8 +205,8 @@ def train(args, dataset, generator, discriminator, monitorExp):
                 for isample in range(nsample):
                     label_code = real_label[isample:isample+1].cuda()
                     image = g_running(label_code, step=step, alpha=alpha)
-                    score,_ = discriminator.module(image, step=step, alpha=alpha)
-                    weight,_ = monitorExp.module(image, step=step, alpha=1.0)
+                    score = discriminator.module(image, step=step, alpha=alpha)
+                    weight = monitorExp.module(image, step=step, alpha=1.0)
                 
                     image = image.data.cpu().numpy()[0].transpose(1, 2, 0)
                     np.set_printoptions(precision=2, suppress=True)
@@ -238,7 +233,7 @@ def train(args, dataset, generator, discriminator, monitorExp):
             )
 
         state_msg = (
-            f'Size: {4 * 2 ** step}; G: {gen_loss_val:.3f}; D: {disc_loss_val:.3f}; Exp: {exp_loss_val:.3f}; Cls: {cls_loss_val:.3f};'
+            f'Size: {4 * 2 ** step}; G: {gen_loss_val:.3f}; D: {disc_loss_val:.3f}; Exp: {exp_loss_val:.3f};'
             f' Grad: {grad_loss_val:.3f}; Alpha: {alpha:.5f}'
         )
 
@@ -261,13 +256,13 @@ if __name__ == '__main__':
     )
     parser.add_argument('--lr', default=0.001, type=float, help='learning rate')
     parser.add_argument('--sched', action='store_true', default=True, help='use lr scheduling')
-    parser.add_argument('--init_size', default=64, type=int, help='initial image size')
-    parser.add_argument('--max_size', default=64, type=int, help='max image size')
+    parser.add_argument('--init_size', default=256, type=int, help='initial image size')
+    parser.add_argument('--max_size', default=256, type=int, help='max image size')
     parser.add_argument(
         '--ckpt', default=None, type=str, help='load from previous checkpoints'
     )
     parser.add_argument(
-        '--ckptExp', default='./checkpoint/monitorExp/resolution-64-iter-3000.model', type=str,
+        '--ckptExp', default='./checkpoint/monitorExp/resolution-256-iter-19999.model', type=str,
     )
     parser.add_argument(
         '--no_from_rgb_activate',
@@ -307,7 +302,7 @@ if __name__ == '__main__':
             'mult': 0.01,
         }
     )
-    d_optimizer = optim.Adam(discriminator.parameters(), lr=args.lr, betas=(0.0, 0.99))
+    d_optimizer = optim.AdamW(discriminator.parameters(), lr=args.lr, betas=(0.0, 0.99))
 
     accumulate(g_running, generator.module, 0)
 
@@ -339,7 +334,7 @@ if __name__ == '__main__':
         # args.phase = 1200_000
         
         # 6 GPU
-        args.batch = {4: 3072, 8: 1536, 16: 768, 32: 384, 64: 400, 128: 192, 256: 192}
+        args.batch = {4: 3072, 8: 1536, 16: 768, 32: 384, 64: 400, 128: 192, 256: 104}
         args.phase = 1200_000
         
         # # 8 GPU
