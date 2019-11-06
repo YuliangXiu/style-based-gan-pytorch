@@ -552,7 +552,6 @@ class Discriminator(nn.Module):
         self.n_layer = len(self.progression)
 
         self.linear = EqualLinear(512, out_channel)
-        self.linear2 = EqualLinear(512, int(out_channel/3))
 
     def forward(self, input, step=0, alpha=-1):
         for i in range(step, -1, -1):
@@ -577,8 +576,6 @@ class Discriminator(nn.Module):
                     out = (1 - alpha) * skip_rgb + alpha * out
 
         out = out.squeeze(2).squeeze(2)
-        # print(input.size(), out.size(), step)
-        out1 = self.linear(out)
-        out2 = self.linear2(out)
+        out = self.linear(out)
 
-        return out1, out2
+        return out

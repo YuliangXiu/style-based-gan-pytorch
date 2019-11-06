@@ -69,23 +69,17 @@ def train_monitorExp(model, resolution, batch_size, label_size):
 
         image = img.cuda()
         target = label.cuda().float()
-        predict, predict2 = model(image, step=step, alpha=1.0)
+        predict = model(image, step=step, alpha=1.0)
         
         model.zero_grad()
 
-        choose_ids = torch.topk(torch.abs(target), dim=1, k=3)[1]
-        loss = MSEloss(torch.gather(predict, 1, choose_ids), torch.gather(target,1,choose_ids)) 
+        loss = MSEloss(predict, target) 
 
-        choose_cls_ids = (torch.min(choose_ids, dim=1)[1]/3).type(torch.cuda.LongTensor)
-        # label_cls = torch.zeros(batch_size, int(label_size/3)).cuda().scatter_(1,choose_cls_ids,1).type(torch.cuda.LongTensor)
-
-        loss2 = CEloss(predict2, choose_cls_ids)
-        total_loss = loss+loss2
-        total_loss.backward()
+        loss.backward()
         optimizer.step()
             
         state_msg = (
-            f'[MonitorExp] Size: {4 * 2 ** step}; MSE_loss: {loss.item():.3f}; CE_loss: {loss2.item():.3f}; Data: {tock-tick:.3f};'
+            f'[MonitorExp] Size: {4 * 2 ** step}; MSE_loss: {loss.item():.3f}; Data: {tock-tick:.3f};'
         )
 
         pbar.set_description(state_msg)
@@ -125,26 +119,25 @@ if __name__ == "__main__":
     parser.add_argument('--testExp', action='store_true')
     args = parser.parse_args()
 
-    os.environ["CUDA_VISIBLE_DEVICES"]="0,1,2,3,4"
-    # os.environ["CUDA_VISIBLE_DEVICES"]="2,3"
+    os.environ["CUDA_VISIBLE_DEVICES"]="0,1,2,3,4,5,6,7"
     
     args.batch = {64: 32, 128: 16, 256: 8, 512: 4, 1024: 2}
 
     label_size = 17*3
     
     if args.trainExp:
-        for step in [6]:
+        for step in [8]:
             resolution = 2 ** step
             monitorExp = nn.DataParallel(Discriminator(from_rgb_activate=True, out_channel=label_size)).cuda()
             # ckpt = torch.load(f'checkpoint/monitorExp/resolution-{2 ** step}-iter-{19999}.model')
             # monitorExp.module.load_state_dict(ckpt['model'])
 
-            pretrained_dict = torch.load(f'checkpoint/monitorExp/resolution-{2 ** step}-iter-{3000}.model')['model']
-            model_dict = monitorExp.module.state_dict()
-            pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict}
-            model_dict.update(pretrained_dict)
-            monitorExp.module.load_state_dict(model_dict)
+            # pretrained_dict = torch.load(f'checkpoint/monitorExp/resolution-{2 ** step}-iter-{3000}.model')['model']
+            # model_dict = monitorExp.module.state_dict()
+            # pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict}
+            # model_dict.update(pretrained_dict)
+            # monitorExp.module.load_state_dict(model_dict)
 
-            batch_size = args.batch.get(resolution, 32) * 15
+            batch_size = args.batch.get(resolution, 32) * 30
             monitorID = train_monitorExp(monitorExp, resolution, batch_size, label_size)
             torch.cuda.empty_cache()

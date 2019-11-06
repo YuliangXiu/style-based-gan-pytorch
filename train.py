@@ -188,7 +188,7 @@ def train(args, dataset, generator, discriminator, monitorExp):
             loss_cls = nn.CrossEntropyLoss()(predict_cls, choose_cls_ids)
             
             if args.loss == 'wgan-gp':
-                loss = -predict.mean() + loss_exp.mean() * 10.0 + loss_cls.mean() * 10.0
+                loss = -predict.mean() + loss_exp.mean() * 1000.0 + loss_cls.mean() * 1000.0
 
             elif args.loss == 'r1':
                 loss = F.softplus(-predict).mean()
@@ -339,7 +339,7 @@ if __name__ == '__main__':
         # args.phase = 1200_000
         
         # 6 GPU
-        args.batch = {4: 3072, 8: 1536, 16: 768, 32: 384, 64: 440, 128: 192, 256: 192}
+        args.batch = {4: 3072, 8: 1536, 16: 768, 32: 384, 64: 400, 128: 192, 256: 192}
         args.phase = 1200_000
         
         # # 8 GPU

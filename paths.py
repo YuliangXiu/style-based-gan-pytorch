@@ -42,11 +42,11 @@ file_displacement_ms = osp(folder_displacement_ms, "*_*_*_displacement.exr")
 
 # facewarehouse expression fitting 1024.
 # e.g. 20191002_RyanWatson_01_blendshape_25_iter_15.mat
-folder_exp_weights = osp(root_yajie, "Meshes/PoseUnit")
-folder_exp_pointcloud_ms = osp(root_yajie, "TrainingData/PoseUnit_stretch/GT_output")
+folder_exp_weights = osp(root_yajie, "Meshes")
+folder_exp_pointcloud_ms = osp(root_yajie, "TrainingData/RandomPosesForVAE_stretch/GT_output")
 
-file_exp_weights = osp(folder_exp_weights, "Pose_*_sequence_*.mat")
-file_exp_pointcloud_ms = osp(folder_exp_pointcloud_ms, "Pose_*_sequence_*.jpg")
+file_exp_weights = osp(folder_exp_weights, "Pose_sequence_*.mat")
+file_exp_pointcloud_ms = osp(folder_exp_pointcloud_ms, "Pose_sequence_*.jpg")
 
 file_exp_meanstd = osp(root_process, "weightsFacewareMeanStd.mat")
 
@@ -86,12 +86,12 @@ def save_mat(filename_out, data, key, skip_if_exist=False):
 #############################################################
 def load_exp_mean():
     # return (25,)
-    mean = np.load("mean_std.npy", allow_pickle=True).item()['mean']
+    mean = np.load("mean-var.npy", allow_pickle=True).item()['mean']
     return mean
     
 def load_exp_std():
     # return (25,)
-    std = np.load("mean_std.npy", allow_pickle=True).item()['std']
+    std = np.load("mean-var.npy", allow_pickle=True).item()['std']
     return std
     
     

@@ -72,12 +72,7 @@ class MultiResolutionDataset():
         mean = torch.from_numpy(self.labels_mean).unsqueeze(0).repeat(k, 1)
         std = torch.from_numpy(self.labels_std).unsqueeze(0).repeat(k, 1)
 
-        mask = torch.zeros((k, 17*3))
-        choose_id = torch.randint(0,17,(k,))
-        choose_ids = torch.stack((choose_id*3, choose_id*3+1, choose_id*3+2),dim=1)
-        mask = mask.scatter_(1, choose_ids, 1)
-
-        return (mask*torch.normal(mean=mean, std=std)).float()
+        return (torch.normal(mean=mean, std=std)).float()
             
     
     def __getitem__(self, index):
